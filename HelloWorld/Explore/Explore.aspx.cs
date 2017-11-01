@@ -19,11 +19,14 @@ namespace HelloWorld.Explore
 			}
 		}
 
-		public void ResetDataBinding(GridView gv)
+		public void ResetDataBinding()
 		{
-			gv.DataSource = null;
+			gvReviews.DataSource = null;
 			//rebind to gridview
-			gv.DataBind();
+			gvReviews.DataBind();
+
+			rpPhotos.DataSource = null;
+			rpPhotos.DataBind();
 		}
 
 		public async Task LoadAttractionsData(string url)
@@ -82,7 +85,8 @@ namespace HelloWorld.Explore
 		{
 			if (Utility.IsValidUrl(txtExplore.Text))
 			{
-				ResetDataBinding(gvReviews);
+				ResetDataBinding();
+
 				string url = txtExplore.Text;
 				RegisterAsyncTask(new PageAsyncTask(() => LoadAttractionsData(url)));
 			}
