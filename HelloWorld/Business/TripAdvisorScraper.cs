@@ -1,4 +1,4 @@
-﻿using HtmlAgilityPack;
+using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -13,10 +13,13 @@ namespace HelloWorld.Business
 	{
 		private string _cityUrl;
 		private string _mainUrl = "https://www.tripadvisor.com.ph";
+		private string _reviewLink;
 		private DataSet dsItinerary;
 		private DataTable dtItinerary;
 		private DataSet dsReviews;
 		private DataTable dtReviews;
+		private DataSet dsPhotos;
+		private DataTable dtPhotos;
 
 		public string CityUrl
 		{
@@ -28,6 +31,13 @@ namespace HelloWorld.Business
 		{
 			get { return _mainUrl; }
 		}
+
+		public string ReviewLinkUrl
+		{
+			get { return _reviewLink; }
+			set { _reviewLink = value; }
+		}
+
 		public TripAdvisorScraper(string url)
 		{
 			CityUrl = url;
@@ -72,6 +82,11 @@ namespace HelloWorld.Business
 			return Task.Run(() => GetAttractionsData());
 		}
 
+		public Task<DataSet> GetTopAttractionsReviewsPhotos()
+		{
+			return Task.Run(() => GetReviewPhotos());
+		}
+
 		private void CreateItineraryData()
 		{
 			dsItinerary = new DataSet();
@@ -91,6 +106,14 @@ namespace HelloWorld.Business
 			dtReviews.Columns.Add(new DataColumn("title", typeof(string)));
 			dtReviews.Columns.Add(new DataColumn("review", typeof(string)));
 			dsReviews.Tables.Add(dtReviews);
+		}
+
+		private void CreatePhotosData()
+		{
+			dsPhotos = new DataSet();
+			dtPhotos = new DataTable("Data");
+			dtPhotos.Columns.Add(new DataColumn("img-src", typeof(string)));
+			dsPhotos.Tables.Add(dtPhotos);
 		}
 
 		private DataSet GetAttractionsData()
@@ -164,10 +187,10 @@ namespace HelloWorld.Business
 		{
 			CreateReviewsData();
 
-			var reviewLink = GetCompleteLink(reviewsUrl);
+			ReviewLinkUrl = GetCompleteLink(reviewsUrl);
 
 			// Get Reviews
-			HtmlDocument document = GetDocument(reviewLink);
+			HtmlDocument document = GetDocument(ReviewLinkUrl);
 			IEnumerable<HtmlNode> reviewTitleNode;
 			IEnumerable<HtmlNode> reviewContentNode;
 
@@ -193,7 +216,7 @@ namespace HelloWorld.Business
 					reviewTitle = (ElementFound(reviewTitleNode)) ? reviewTitleNode.First().InnerText : "No Review Title Found";
 					drNew["title"] = reviewTitle;
 
-					reviewContentNode = review.Descendants("p").Where(d => d.Attributes.Contains("id"));
+					reviewContentNode = review.Descendants("p").Where(d => d.Attributes["class"].Value.Contains("partial_entry"));
 					reviewContent = (ElementFound(reviewContentNode)) ? reviewContentNode.First().InnerText : "No Review Content Found";
 					drNew["review"] = reviewContent;
 
@@ -217,10 +240,10 @@ namespace HelloWorld.Business
 			foreach (HtmlNode topPlace in topPlacesNode)
 			{
 				var link = topPlace.Descendants("a").First().GetAttributeValue("href", null); //Get url
-				var reviewLink = GetCompleteLink(link);
+				ReviewLinkUrl = GetCompleteLink(link);
 
 				// Get Reviews
-				document = GetDocument(reviewLink);
+				document = GetDocument(ReviewLinkUrl);
 
 				// Get full Review
 				IEnumerable<HtmlNode> newReviewNode = GetUserReviews(document);
@@ -236,7 +259,7 @@ namespace HelloWorld.Business
 						var p = review.Descendants("p").Where(d => d.Attributes.Contains("id"));
 						DataRow drNew = dtItinerary.NewRow();
 						drNew["name"] = topPlace.InnerText;
-						drNew["url"] = reviewLink;
+						drNew["url"] = ReviewLinkUrl;
 						drNew["review"] = p.First().InnerText;
 						dtItinerary.Rows.Add(drNew);
 					}
@@ -266,6 +289,35 @@ namespace HelloWorld.Business
 					&& d.Attributes["class"].Value.Contains("innerBubble"));
 
 			return reviews;
+		}
+
+		private DataSet GetReviewPhotos()
+		{
+			CreatePhotosData();
+
+			HtmlDocument doc = GetDocument(ReviewLinkUrl);
+
+			IEnumerable<HtmlNode> reviews = doc.DocumentNode
+				.Descendants("div")
+				.Where(d =>
+					d.Attributes.Contains("class")
+					&& d.Attributes["class"].Value.Contains("prw_rup prw_common_location_photos"));
+
+			IEnumerable<HtmlNode> photos = reviews.First().Descendants("img")
+			.Where(d =>
+				d.Attributes.Contains("class")
+				&& d.Attributes["class"].Value.Contains("centeredImg")
+				&& d.Attributes.Contains("data-src"));
+
+			foreach (HtmlNode img in photos)
+			{
+				//string src = img.GetAttributeValue("data-src", "Not Image Found");
+				DataRow drNew = dtPhotos.NewRow();
+				drNew["img-src"] = img.GetAttributeValue("data-src", "Not Image Found");
+				dtPhotos.Rows.Add(drNew);
+			}
+
+			return dsPhotos;
 		}
 
 		// Used to get reviews link
