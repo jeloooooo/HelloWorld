@@ -1,4 +1,4 @@
-﻿using HelloWorld.Business;
+using HelloWorld.Business;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -46,6 +46,11 @@ namespace HelloWorld.Explore
 
 			gvReviews.DataSource = ds;
 			gvReviews.DataBind();
+
+			DataSet dsPhoto = await tas.GetTopAttractionsReviewsPhotos();
+
+			rpPhotos.DataSource = dsPhoto;
+			rpPhotos.DataBind();
 		}
 
 		protected void btnExplore_Click(object sender, EventArgs e)
